@@ -53,6 +53,10 @@
             placeholder="e.g. Alzheimer's disease, lung cancer, Type 2 diabetes..."
             autocomplete="off"
           />
+          <label class="upload-btn" title="Upload medical document or image for Gemini Vision analysis">
+            📸
+            <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)" style="display:none;" />
+          </label>
           <button class="search-btn" id="searchBtn" onclick="runSearch()">
             <span id="searchBtnText">Analyze</span>
             <span class="search-arrow">→</span>
@@ -91,6 +95,11 @@
       <div class="stat-item">
         <span class="stat-value" id="statDisease">—</span>
         <span class="stat-label">Disease Area</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item action-stat" onclick="generateAnalysisScript()" title="Generate Python script to analyze these trials">
+        <span class="stat-value">💻</span>
+        <span class="stat-label" style="color:var(--accent-blue)">Export Script</span>
       </div>
     </div>
 
@@ -159,6 +168,22 @@
     <div class="modal" id="modal" onclick="event.stopPropagation()">
       <button class="modal-close" onclick="closeModal()">✕</button>
       <div class="modal-content" id="modalContent"></div>
+    </div>
+  </div>
+
+  <!-- Chatbot UI -->
+  <button class="chat-fab" onclick="toggleChat()">💬 Chat</button>
+  <div class="chat-panel" id="chatPanel" style="display:none;">
+    <div class="chat-header">
+      <h4>✦ Chat with PharmaPulse</h4>
+      <button class="chat-close" onclick="toggleChat()">✕</button>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="message ai-msg">Hi! I'm your Gemini AI assistant. Search for a disease first, then ask me anything about the clinical trials!</div>
+    </div>
+    <div class="chat-input-area">
+      <input type="text" id="chatInput" placeholder="Ask about these trials..." onkeydown="if(event.key==='Enter') sendChatMessage()" />
+      <button class="chat-send" onclick="sendChatMessage()">Send</button>
     </div>
   </div>
 

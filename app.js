@@ -492,3 +492,184 @@ function escHtml(str) {
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+// ============================================
+// Phase 2: Multimodal, Code Gen, and Chatbot
+// ============================================
+
+// ---- 1. Multimodal AI (Image Upload) ----
+async function handleImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!geminiApiKey) {
+    alert("Please provide a Gemini API key first to use Vision capabilities.");
+    return;
+  }
+
+  showLoadingState();
+  setLoadingMsg("📸 Analyzing medical image...");
+
+  try {
+    const base64Data = await readFileAsBase64(file);
+    // Remove the data:image/jpeg;base64, prefix for the API
+    const base64Image = base64Data.split(",")[1];
+    
+    const prompt = `You are a medical analyst. The user is currently searching for trials related to "${currentDisease || 'a disease'}". 
+    Analyze this uploaded image in that context. What does it show? Be concise and highly informative.`;
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${geminiApiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: file.type, data: base64Image } }
+          ]
+        }]
+      })
+    });
+
+    if (!res.ok) throw new Error("Vision API failed.");
+    const data = await res.json();
+    const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Could not analyze image.";
+    
+    hideLoadingState();
+    
+    // Show in modal
+    const content = document.getElementById("modalContent");
+    content.innerHTML = `
+      <div class="modal-drug-title">📸 Image Analysis Results</div>
+      <div class="modal-ai-text" style="margin-top:20px;">${escHtml(resultText)}</div>
+    `;
+    document.getElementById("modalOverlay").classList.add("active");
+
+  } catch (err) {
+    console.error(err);
+    hideLoadingState();
+    alert("Failed to analyze image. See console for details.");
+  }
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---- 2. Code Generation (Export Script) ----
+async function generateAnalysisScript() {
+  if (!allCards || allCards.length === 0) {
+    alert("Please search for clinical trials first.");
+    return;
+  }
+  if (!geminiApiKey) {
+    alert("Gemini API key is required to generate code.");
+    return;
+  }
+
+  // Create a minimal dataset representation to send to the prompt
+  const datasetContext = allCards.map(c => 
+    `{title: "${c.data.title}", phase: "${c.data.phase}", sponsor: "${c.data.sponsor}", enrollment: "${c.data.enrollment}"}`
+  ).join(",\n");
+
+  const prompt = `Write a Python script using pandas and matplotlib to analyze the following clinical trial dataset for "${currentDisease}".
+  
+Dataset:
+[
+${datasetContext}
+]
+
+Requirements:
+1. Load this exact dataset as a pandas DataFrame.
+2. Clean the 'enrollment' column (handle '—' or non-numeric values).
+3. Create a bar chart showing the number of trials by Phase.
+4. Output only the Python code inside a markdown code block, no other text.`;
+
+  showLoadingState();
+  setLoadingMsg("💻 Generating Python analysis script...");
+
+  try {
+    const codeResponse = await callGemini(prompt);
+    hideLoadingState();
+    if (allCards.length > 0) {
+      document.getElementById("resultsSection").style.display = "block";
+      document.getElementById("statsBar").style.display = "flex";
+      document.getElementById("aiOverview").style.display = "block";
+    }
+
+    let cleanCode = codeResponse.replace(/```python|```/g, "").trim();
+    if (!cleanCode) cleanCode = "# Failed to generate script.";
+
+    const content = document.getElementById("modalContent");
+    content.innerHTML = `
+      <div class="modal-drug-title">💻 Python Analysis Script</div>
+      <p style="color:var(--text-secondary);font-size:13px;margin:12px 0;">Run this script locally to visualize the trial dataset.</p>
+      <div class="code-container" id="exportCodeBlock">${escHtml(cleanCode)}</div>
+      <button class="chat-send" style="margin-top:16px;" onclick="navigator.clipboard.writeText(document.getElementById('exportCodeBlock').textContent); alert('Copied!')">Copy to Clipboard</button>
+    `;
+    document.getElementById("modalOverlay").classList.add("active");
+  } catch (err) {
+    console.error(err);
+    hideLoadingState();
+    alert("Failed to generate code.");
+  }
+}
+
+// ---- 3. Conversational AI (Chatbot) ----
+let chatHistory = [];
+
+function toggleChat() {
+  const panel = document.getElementById("chatPanel");
+  panel.style.display = panel.style.display === "none" ? "flex" : "none";
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById("chatInput");
+  const msg = input.value.trim();
+  if (!msg) return;
+  
+  if (!geminiApiKey) {
+    alert("Gemini API key is required to chat.");
+    return;
+  }
+
+  input.value = "";
+  addChatMessage("user", msg);
+
+  // Build context
+  const context = `You are PharmaPulse AI. The user is asking about the disease "${currentDisease}". 
+  There are ${allCards.length} clinical trials currently displayed on the dashboard. Answer concisely and professionally.
+  Current chat history: ${JSON.stringify(chatHistory.slice(-4))}
+  User's question: ${msg}`;
+
+  chatHistory.push({ role: "user", text: msg });
+
+  const typingId = "typing-" + Date.now();
+  const chatMessages = document.getElementById("chatMessages");
+  chatMessages.innerHTML += `<div class="message ai-msg" id="${typingId}">...</div>`;
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  try {
+    const response = await callGemini(context);
+    document.getElementById(typingId).remove();
+    const reply = response || "I'm sorry, I couldn't process that request.";
+    addChatMessage("ai", reply);
+    chatHistory.push({ role: "model", text: reply });
+  } catch (err) {
+    document.getElementById(typingId).remove();
+    addChatMessage("ai", "An error occurred.");
+  }
+}
+
+function addChatMessage(sender, text) {
+  const chatMessages = document.getElementById("chatMessages");
+  const msgDiv = document.createElement("div");
+  msgDiv.className = `message ${sender === 'user' ? 'user-msg' : 'ai-msg'}`;
+  msgDiv.textContent = text;
+  chatMessages.appendChild(msgDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
