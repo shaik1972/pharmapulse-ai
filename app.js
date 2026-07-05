@@ -51,7 +51,7 @@ async function runSearch() {
   try {
     // Step 1: Fetch clinical trials
     setLoadingMsg("🔬 Fetching live clinical trials...");
-    const trials = await fetchClinicalTrials(input);
+    const { trials, totalCount } = await fetchClinicalTrials(input);
 
     if (!trials || trials.length === 0) {
       showEmpty();
@@ -59,7 +59,7 @@ async function runSearch() {
     }
 
     // Step 2: Update stats
-    document.getElementById("statTrials").textContent = trials.length;
+    document.getElementById("statTrials").textContent = totalCount > trials.length ? `${trials.length} (of ${totalCount})` : trials.length;
     document.getElementById("statDisease").textContent =
       input.charAt(0).toUpperCase() + input.slice(1);
 
@@ -100,11 +100,11 @@ async function fetchClinicalTrials(disease) {
     "format": "json",
   });
 
-  const res = await fetch(`https://clinicaltrials.gov/api/v2/studies?${params}`);
+  const res = await fetch(`https://clinicaltrials.gov/api/v2/studies?${params}&countTotal=true`);
   if (!res.ok) throw new Error(`ClinicalTrials.gov API error: ${res.status}`);
   const data = await res.json();
 
-  return (data.studies || []).map((s) => {
+  const trialsArray = (data.studies || []).map((s) => {
     const p = s.protocolSection || {};
     const id = p.identificationModule || {};
     const status = p.statusModule || {};
@@ -123,6 +123,8 @@ async function fetchClinicalTrials(disease) {
       conditions: (p.conditionsModule?.conditions || []).join(", "),
     };
   });
+
+  return { trials: trialsArray, totalCount: data.totalCount || trialsArray.length };
 }
 
 function extractPhase(phases) {
@@ -222,7 +224,9 @@ async function callGemini(prompt) {
     if (!res.ok) {
       const err = await res.json();
       console.warn("Gemini error:", err);
-      return null;
+      const errMsg = err.error?.message || "Unknown error";
+      if (res.status === 429) return "API Rate limit exceeded. Please wait a moment.";
+      return `Error: ${errMsg}`;
     }
     const data = await res.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
@@ -517,7 +521,7 @@ async function handleImageUpload(event) {
     const prompt = `You are a medical analyst. The user is currently searching for trials related to "${currentDisease || 'a disease'}". 
     Analyze this uploaded image in that context. What does it show? Be concise and highly informative.`;
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${geminiApiKey}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
