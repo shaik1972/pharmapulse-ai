@@ -521,7 +521,7 @@ async function handleImageUpload(event) {
     const prompt = `You are a medical analyst. The user is currently searching for trials related to "${currentDisease || 'a disease'}". 
     Analyze this uploaded image in that context. What does it show? Be concise and highly informative.`;
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

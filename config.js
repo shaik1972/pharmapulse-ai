@@ -10,7 +10,7 @@ const CONFIG = {
   GEMINI_API_KEY: "", // Leave blank — app will prompt you once
 
   // Gemini model to use
-  GEMINI_MODEL: "gemini-1.5-flash",
+  GEMINI_MODEL: "gemini-1.5-flash-latest",
 
   // Max clinical trials to fetch
   MAX_TRIALS: 12,
