@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PharmaPulse AI — Drug Pipeline Intelligence</title>
+  <meta name="description" content="AI-powered drug pipeline tracker. Track clinical trials, FDA approvals, and get Gemini AI insights on any disease area in real time." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Background ambient orbs -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">💊</span>
+        <div class="logo-text">
+          <span class="logo-title">PharmaPulse</span>
+          <span class="logo-badge">AI</span>
+        </div>
+      </div>
+      <div class="header-meta">
+        <span class="live-indicator"><span class="pulse-dot"></span>Live Data</span>
+        <span class="powered-by">Powered by <strong>Gemini AI</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Search Section -->
+  <main class="main">
+    <section class="hero">
+      <h1 class="hero-title">Drug Pipeline Intelligence</h1>
+      <p class="hero-subtitle">
+        Search any disease area — our AI agent fetches live clinical trials,
+        FDA approval status, and synthesizes insights in seconds.
+      </p>
+
+      <div class="search-container">
+        <div class="search-box" id="searchBox">
+          <span class="search-icon">🔬</span>
+          <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            placeholder="e.g. Alzheimer's disease, lung cancer, Type 2 diabetes..."
+            autocomplete="off"
+          />
+          <button class="search-btn" id="searchBtn" onclick="runSearch()">
+            <span id="searchBtnText">Analyze</span>
+            <span class="search-arrow">→</span>
+          </button>
+        </div>
+
+        <!-- Quick chips -->
+        <div class="quick-chips">
+          <span class="chip-label">Try:</span>
+          <button class="chip" onclick="quickSearch('Alzheimer\'s disease')">Alzheimer's</button>
+          <button class="chip" onclick="quickSearch('lung cancer')">Lung Cancer</button>
+          <button class="chip" onclick="quickSearch('Type 2 diabetes')">Type 2 Diabetes</button>
+          <button class="chip" onclick="quickSearch('breast cancer')">Breast Cancer</button>
+          <button class="chip" onclick="quickSearch('Parkinson\'s disease')">Parkinson's</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stats Bar (shown after search) -->
+    <div class="stats-bar" id="statsBar" style="display:none">
+      <div class="stat-item">
+        <span class="stat-value" id="statTrials">—</span>
+        <span class="stat-label">Clinical Trials</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-value" id="statFDA">—</span>
+        <span class="stat-label">FDA Records</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-value" id="statAI">✦ Gemini</span>
+        <span class="stat-label">AI Summaries</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-value" id="statDisease">—</span>
+        <span class="stat-label">Disease Area</span>
+      </div>
+    </div>
+
+    <!-- AI Overview Panel -->
+    <div class="ai-overview" id="aiOverview" style="display:none">
+      <div class="ai-overview-header">
+        <span class="gemini-badge">✦ Gemini AI Overview</span>
+        <div class="ai-loading" id="aiOverviewLoader">
+          <div class="typing-dots"><span></span><span></span><span></span></div>
+          <span>Synthesizing research...</span>
+        </div>
+      </div>
+      <p class="ai-overview-text" id="aiOverviewText"></p>
+    </div>
+
+    <!-- Loading State -->
+    <div class="loading-state" id="loadingState" style="display:none">
+      <div class="loading-grid">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
+      <div class="loading-msg">
+        <div class="spinner"></div>
+        <span id="loadingMsg">Fetching live trial data...</span>
+      </div>
+    </div>
+
+    <!-- Results Grid -->
+    <section class="results-section" id="resultsSection" style="display:none">
+      <div class="results-header">
+        <h2 class="results-title" id="resultsTitle">Drug Pipeline</h2>
+        <div class="results-filters">
+          <button class="filter-btn active" onclick="filterPhase('all')">All</button>
+          <button class="filter-btn" onclick="filterPhase('1')">Phase 1</button>
+          <button class="filter-btn" onclick="filterPhase('2')">Phase 2</button>
+          <button class="filter-btn" onclick="filterPhase('3')">Phase 3</button>
+          <button class="filter-btn" onclick="filterPhase('4')">Phase 4</button>
+        </div>
+      </div>
+      <div class="drug-grid" id="drugGrid"></div>
+    </section>
+
+    <!-- Empty State -->
+    <div class="empty-state" id="emptyState" style="display:none">
+      <div class="empty-icon">🔭</div>
+      <h3>No trials found</h3>
+      <p>Try a different disease name or broader search term.</p>
+    </div>
+
+    <!-- Error State -->
+    <div class="error-state" id="errorState" style="display:none">
+      <div class="error-icon">⚠️</div>
+      <h3 id="errorTitle">Something went wrong</h3>
+      <p id="errorMsg">Please check your API key and try again.</p>
+      <button class="retry-btn" onclick="runSearch()">Retry</button>
+    </div>
+
+  </main>
+
+  <!-- Drug Detail Modal -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
+    <div class="modal" id="modal" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div class="modal-content" id="modalContent"></div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>PharmaPulse AI &mdash; Data from <strong>ClinicalTrials.gov</strong> &amp; <strong>openFDA</strong> &bull; Insights by <strong>Gemini AI</strong></p>
+    <p class="footer-disclaimer">For research purposes only. Not medical advice.</p>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
