@@ -6,7 +6,6 @@
 let allCards = [];
 let currentDisease = "";
 let geminiApiKey = "";
-let activeGeminiModel = null; // auto-detected at runtime
 
 // ---- Init ----
 window.addEventListener("DOMContentLoaded", () => {
@@ -234,52 +233,12 @@ async function generateCardSummaries(trials) {
   }
 }
 
-// ---- Gemini Model Auto-Detect ----
-async function detectGeminiModel() {
-  if (activeGeminiModel) return activeGeminiModel; // cached
-
-  for (const candidate of CONFIG.GEMINI_MODEL_CANDIDATES) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/${candidate.version}/models/${candidate.model}:generateContent?key=${geminiApiKey}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: "Hi" }] }],
-          generationConfig: { maxOutputTokens: 5 },
-        }),
-        signal: AbortSignal.timeout(8000),
-      });
-      if (res.ok || res.status === 400) {
-        // 400 = bad request (model found but prompt issue) — still means model exists
-        console.log(`✅ Gemini model detected: ${candidate.version}/${candidate.model}`);
-        activeGeminiModel = candidate;
-        return activeGeminiModel;
-      }
-      const err = await res.json().catch(() => ({}));
-      console.warn(`❌ Model ${candidate.model} (${candidate.version}): ${err?.error?.message || res.status}`);
-    } catch (e) {
-      console.warn(`❌ Timeout/network error for ${candidate.model}`);
-    }
-  }
-  return null;
-}
-
 // ---- Gemini API Call ----
 async function callGemini(prompt) {
   if (!geminiApiKey) return null;
 
-  // Auto-detect model on first call
-  if (!activeGeminiModel) {
-    activeGeminiModel = await detectGeminiModel();
-    if (!activeGeminiModel) {
-      console.error("No working Gemini model found.");
-      return "AI unavailable — no compatible Gemini model found for your API key.";
-    }
-  }
-
   try {
-    const url = `https://generativelanguage.googleapis.com/${activeGeminiModel.version}/models/${activeGeminiModel.model}:generateContent?key=${geminiApiKey}`;
+    const url = `https://generativelanguage.googleapis.com/${CONFIG.GEMINI_API_VERSION}/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${geminiApiKey}`;
     const res = await fetch(url,
       {
         method: "POST",
@@ -291,20 +250,17 @@ async function callGemini(prompt) {
         signal: AbortSignal.timeout(20000),
       }
     );
+    
     if (!res.ok) {
-      const err = await res.json();
-      console.warn("Gemini error:", err);
-      const errMsg = err.error?.message || "Unknown error";
-      if (res.status === 429) return "Rate limit reached — please wait a moment and try again.";
-      // If this model stopped working, reset and retry next call
-      if (res.status === 404) { activeGeminiModel = null; }
-      return null;
+      if (res.status === 429) return "Hold on! The API is busy right now. Please wait a moment and try again.";
+      if (res.status === 400) return "Oops, the API key might be invalid or restricted.";
+      return "Sorry, the AI service is currently unavailable.";
     }
+    
     const data = await res.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
   } catch (err) {
-    console.warn("Gemini call failed:", err);
-    return null;
+    return "Network error — please check your connection and try again.";
   }
 }
 
@@ -593,11 +549,7 @@ async function handleImageUpload(event) {
     const prompt = `You are a medical analyst. The user is currently searching for trials related to "${currentDisease || 'a disease'}". 
     Analyze this uploaded image in that context. What does it show? Be concise and highly informative.`;
 
-    // Use auto-detected model (same as chat/summaries)
-    if (!activeGeminiModel) activeGeminiModel = await detectGeminiModel();
-    if (!activeGeminiModel) throw new Error("No compatible Gemini model found for your API key.");
-
-    const visionUrl = `https://generativelanguage.googleapis.com/${activeGeminiModel.version}/models/${activeGeminiModel.model}:generateContent?key=${geminiApiKey}`;
+    const visionUrl = `https://generativelanguage.googleapis.com/${CONFIG.GEMINI_API_VERSION}/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${geminiApiKey}`;
     const res = await fetch(visionUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
