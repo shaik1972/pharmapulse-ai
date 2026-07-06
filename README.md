@@ -4,6 +4,8 @@
 
 ![PharmaPulse AI](https://img.shields.io/badge/AI%20Capabilities-7%2F7-brightgreen) ![Gemini](https://img.shields.io/badge/Powered%20by-Gemini%20AI-blue) ![License](https://img.shields.io/badge/License-MIT-yellow)
 
+![PharmaPulse AI Cover](docs/images/covercard.png)
+
 ## 🎯 What It Does
 
 Search any disease area and PharmaPulse AI will:
