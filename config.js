@@ -9,11 +9,14 @@ const CONFIG = {
   // Reads from meta tag OR falls back to prompt
   GEMINI_API_KEY: "", // Leave blank — app will prompt you once
 
-  // Gemini model to use
-  GEMINI_MODEL: "gemini-1.5-flash",
-
-  // Gemini API version
-  GEMINI_API_VERSION: "v1",
+  // Gemini model candidates to try in order (app auto-picks the first working one)
+  GEMINI_MODEL_CANDIDATES: [
+    { version: "v1beta", model: "gemini-2.0-flash" },
+    { version: "v1beta", model: "gemini-2.0-flash-lite" },
+    { version: "v1beta", model: "gemini-1.5-flash" },
+    { version: "v1",     model: "gemini-1.5-flash" },
+    { version: "v1beta", model: "gemini-pro" },
+  ],
 
   // Max clinical trials to fetch
   MAX_TRIALS: 12,
