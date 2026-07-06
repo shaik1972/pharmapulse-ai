@@ -139,35 +139,63 @@ function extractPhase(phases) {
 }
 
 // ---- openFDA API ----
+// Extracts the most likely drug/compound name from a trial title by
+// stripping common boilerplate prefixes and returning the first meaningful words.
+function extractDrugTermFromTitle(title) {
+  return title
+    // Strip leading boilerplate phrases common in trial titles
+    .replace(/^(A |An |The )?(Phase \d\/?[\dIV]* )?(,? )?(Randomized,? )?(Double-Blind,? )?(Placebo-Controlled,? )?(Open-Label,? )?(Multi[- ]?[Cc]enter,? )?(Study|Trial|Assessment|Evaluation|Investigation) of /i, "")
+    .split(/[,\s]+/)   // split on space/comma
+    .filter(w => w.length > 3 && !/^(and|with|for|the|of|in|on|to|vs|versus|study|trial)$/i.test(w))
+    .slice(0, 2)
+    .join(" ")
+    .trim();
+}
+
+async function fetchFDASingle(trial, disease) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
+
+  // Strategy 1: Search by sponsor name (most reliable)
+  const strategies = [
+    // Sponsor name search
+    `https://api.fda.gov/drug/drugsfda.json?search=applicant_full_name:"${encodeURIComponent(trial.sponsor)}"&limit=1`,
+    // Drug term extracted from title
+    `https://api.fda.gov/drug/drugsfda.json?search=products.brand_name:"${encodeURIComponent(extractDrugTermFromTitle(trial.title))}"&limit=1`,
+    // Disease-level generic search
+    `https://api.fda.gov/drug/drugsfda.json?search=products.brand_name:${encodeURIComponent(disease.split(" ")[0])}&limit=1`,
+  ];
+
+  for (const url of strategies) {
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) continue;                    // silently try next strategy
+      const data = await res.json();
+      const result = data.results?.[0];
+      if (!result) continue;
+      clearTimeout(timeout);
+      return {
+        applicationNumber: result.application_number,
+        sponsorName: result.sponsor_name || result.applicant_full_name,
+        approved: result.products?.some((p) => p.marketing_status === "Prescription"),
+        brandName: result.products?.[0]?.brand_name || null,
+      };
+    } catch {
+      // Silently continue — abort or network error
+    }
+  }
+
+  clearTimeout(timeout);
+  return null; // All strategies failed — expected for experimental drugs
+}
+
 async function fetchFDABulk(trials) {
+  // Run all FDA lookups concurrently, each with its own silent fallback chain
   return await Promise.all(
-    trials.map(async (trial) => {
-      try {
-        const query = encodeURIComponent(
-          trial.title.split(" ").slice(0, 4).join(" ")
-        );
-        const res = await fetch(
-          `https://api.fda.gov/drug/drugsfda.json?search=products.brand_name:"${query}"&limit=1`,
-          { signal: AbortSignal.timeout(4000) }
-        );
-        if (!res.ok) return null;
-        const data = await res.json();
-        const result = data.results?.[0];
-        if (!result) return null;
-        return {
-          applicationNumber: result.application_number,
-          sponsorName: result.sponsor_name,
-          approved: result.products?.some((p) =>
-            p.marketing_status === "Prescription"
-          ),
-          brandName: result.products?.[0]?.brand_name || null,
-        };
-      } catch {
-        return null;
-      }
-    })
+    trials.map((trial) => fetchFDASingle(trial, currentDisease).catch(() => null))
   );
 }
+
 
 // ---- Gemini AI — Overview ----
 async function generateOverview(disease, trials) {
